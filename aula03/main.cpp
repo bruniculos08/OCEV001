@@ -4,17 +4,17 @@ int main(void)
 {
     srandom(time(0));
 
+    formula sat;
+    fromFileGenerate3SAT(sat, "data.txt");
+    print3SAT(sat);
+
     population p;
-    p.pop_size = 2;
-    p.ind_dim = 100;
+    p.pop_size = 40;
+    p.ind_dim = sat.number_of_variables;
     p.type_size = sizeof(bool);
 
     p.matrix = (void **) generateBoolPop(p.ind_dim, p.pop_size);
     printBoolMatrix((bool **) p.matrix, p.ind_dim, p.pop_size);
-
-    formula sat;
-    generate3SAT(sat, 430, p.ind_dim);
-    print3SAT(sat);
 
     int xmen = evolve(sat, p);
     cout << "final best = " << xmen << endl;
@@ -143,7 +143,7 @@ int **generatePermPop(int ind_dim, int pop_size, int low, int high)
 
 bool **generateBoolPop(int ind_dim, int pop_size)
 {
-    // srand(time(0));
+    srand(time(0));
     bool temp = true;
 
     bool **matrix;
@@ -187,7 +187,32 @@ void generate3SAT(formula &sat, int formula_size, int variables_num)
     sat.expr = (clause *) malloc(sizeof(clause) * formula_size);
     for(int i = 0; i < formula_size; i++)
     {
-        for(int j = 0; j < 3; j++) sat.expr[i].variables[j] = random() % variables_num; 
+        for(int j = 0; j < 3; j++) sat.expr[i].variables[j] = (random() % variables_num) + 1; 
+    }
+}
+
+void fromFileGenerate3SAT(formula &sat, string file_path)
+{
+    ifstream my_file (file_path); 
+    string line;
+    char *cstr = new char[1024];
+
+    assert(my_file.is_open());
+
+    getline(my_file, line);
+    strcpy(cstr, line.c_str());
+
+    int number_of_variables, number_of_clauses;
+    sscanf(cstr, "%*s %*s %i %i\n", &number_of_variables, &number_of_clauses);
+
+    sat.formumla_size = number_of_clauses;
+    sat.number_of_variables = number_of_variables;
+    sat.expr = (clause *) malloc(sizeof(clause) * number_of_clauses);
+
+    for(int i = 0; i < number_of_clauses && getline(my_file, line); i++)
+    {  
+        strcpy(cstr, line.c_str());
+        sscanf(cstr, "%d %d %d %*s", &sat.expr[i].variables[0], &sat.expr[i].variables[1], &sat.expr[i].variables[2]);
     }
 }
 
@@ -197,15 +222,16 @@ int evolve(formula &sat, population &p)
     vector<bool *> children;
     do
     {
-        int ind1 = tournament(sat, 5, p), ind2 = tournament(sat, 2, p);
+        int ind1 = tournament(sat, 10, p, -1), ind2 = tournament(sat, 10, p, ind1);
         bool *son;
-        son = (bool *) breed(ind1, ind2, p);
+        son = (bool *) crossover(ind1, ind2, p);
         mutation(son, p);
         children.push_back(son);
 
         if(children.size() == p.pop_size)
         {
             changeGeneration(children, p);
+            cout << "last generation best fitness = " << fitness(sat, current_best_id, p) << endl;
             children.clear();
         }
 
@@ -217,8 +243,6 @@ int evolve(formula &sat, population &p)
                 current_best_id = i;
             }
         }
-
-        cout << "best fitness = " << best_fitness << endl;
 
     } while (best_fitness != sat.formumla_size);
     return current_best_id;
@@ -241,8 +265,11 @@ void print3SAT(formula &sat)
 {
     for (int i = 0; i < sat.formumla_size; i++)
     {
-        cout << "(x" << sat.expr[i].variables[0] << " \\/ x" << sat.expr[i].variables[1]
-            << " \\/ x" << sat.expr[i].variables[2] << ")";   
+        cout << "(";
+        (sat.expr[i].variables[0] > 0) ? cout << "x" << sat.expr[i].variables[0] : cout << "¬x" << abs(sat.expr[i].variables[0]);
+        (sat.expr[i].variables[1] > 0) ? cout << " \\/ x" << sat.expr[i].variables[1] : cout << " \\/ ¬x" << abs(sat.expr[i].variables[1]);
+        (sat.expr[i].variables[2] > 0) ? cout << " \\/ x" << sat.expr[i].variables[2] : cout << " \\/ ¬x" << abs(sat.expr[i].variables[2]);
+        cout << ")";   
         if(i != sat.formumla_size - 1) cout << " /\\ ";  
     }
     cout << endl;
@@ -255,31 +282,38 @@ int fitness(formula &sat, int ind_id, population &p)
     for(int i = 0; i < sat.formumla_size; i++)
     {
         clause phi = sat.expr[i];
-        bool value = matrix[ind_id][phi.variables[0]] || matrix[ind_id][phi.variables[1]] || matrix[ind_id][phi.variables[2]];
+        bool value = false;
+        value = value || (phi.variables[0] >= 0) ? matrix[ind_id][phi.variables[0] - 1] : !(matrix[ind_id][abs(phi.variables[0]) - 1]);
+        value = value || (phi.variables[1] >= 0) ? matrix[ind_id][phi.variables[1] - 1] : !(matrix[ind_id][abs(phi.variables[1]) - 1]);
+        value = value || (phi.variables[2] >= 0) ? matrix[ind_id][phi.variables[2] - 1] : !(matrix[ind_id][abs(phi.variables[2]) - 1]);
         if(value) count++; 
     }
     return count;
 }
 
-int tournament(formula &sat, int samples_num, population &p)
+int tournament(formula &sat, int samples_num, population &p, int exclude_id)
 {
     int choosen_ind_id = -1, rand_id, best_fitness = -1;
     for(int i = 0; i < samples_num; i++)
     {
         rand_id = (random() % p.pop_size);
+        if(rand_id == exclude_id)
+            if(exclude_id == p.pop_size - 1) rand_id--;
+            else rand_id++; 
+
         if(best_fitness == -1 || fitness(sat, rand_id, p) > best_fitness) 
-            choosen_ind_id = rand_id;
+            choosen_ind_id = rand_id;        
     }
     return choosen_ind_id;
 }
 
-void *breed(int ind1, int ind2, population &p)
+void *crossover(int ind1, int ind2, population &p)
 {
     void *son;
     son = malloc(p.type_size * p.ind_dim);
     for (int i = 0; i < p.ind_dim; i++)
     {
-        ((random() % 2) == 0) 
+        (random() % 2 == 0)
             ? memcpy((char *) son + i * p.type_size, ((char *) *(p.matrix + ind1) + i * p.type_size), p.type_size)
             : memcpy((char *) son + i * p.type_size, ((char *) *(p.matrix + ind2) + i * p.type_size), p.type_size);  
     }
@@ -290,9 +324,7 @@ void mutation(bool *dna, population &p)
 {
     for (int i = 0; i < p.ind_dim; i++)
     {
-        bool *b;
-        b = dna + i;
         if(1.0 / (double) p.ind_dim <= (double) random()/ (double) RAND_MAX)
-            *b = !(*b);
+            dna[i] = !dna[i];
     }
 }
