@@ -7,10 +7,17 @@ using namespace std;
 #define MUTATION_PROBABILITY 0.00001
 double C_min = 0;
 
+union allele
+{
+    int integer;
+    bool boolean;
+    double real;
+};
+
 typedef struct Population
 {
-    void **matrix;
-    int type_size, ind_dim, pop_size;
+    vector<vector<allele>> matrix;
+    int ind_dim, pop_size;
 } population;
 
 typedef struct Function_info
@@ -23,17 +30,17 @@ typedef struct Function_info
 
 // Funções auxiliares:
 int clampi(int x, int low, int high);
-void **allocateGenericMatrix(int width, int height, void *value, int type_size);
-void printIntMatrix(int **matrix, int width, int height);
-void printBoolMatrix(bool **matrix, int width, int height);
-void printDoubleMatrix(double **matrix, int width, int height);
-void permute(int *list, int size);
+vector<vector<allele>> allocateGenericMatrix(int width, int height, allele &value);
+void printIntMatrix(vector<vector<allele>> &matrix);
+void printBoolMatrix(vector<vector<allele>> &matrix);
+void printDoubleMatrix(vector<vector<allele>> &matrix);
+void permute(vector<allele> &v);
 
 // Funções para gerar população:
-int **generateIntPop(int ind_dim, int pop_size, int low, int high);
-int **generatePermPop(int ind_dim, int pop_size, int low, int high);
-bool **generateBoolPop(int ind_dim, int pop_size);
-double **generateDoublePop(int ind_dim, int pop_size, double low, double high);
+void generateIntPop(int width, int height, vector<vector<allele>> &v, allele low, allele high);
+void generatePermPop(int width, int height, vector<vector<allele>> &v, allele low, allele high);
+void generateBoolPop(int width, int height, vector<vector<allele>> &v);
+void generateDoublePop(int width, int height, vector<vector<allele>> &v, allele low, allele high);
 
 /* --------------------- Funções para modelagem do problema de função real --------------------- */
 

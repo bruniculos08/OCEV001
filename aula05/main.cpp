@@ -47,7 +47,8 @@ void **allocateGenericMatrix(int width, int height, void *value, int type_size)
         *(matrix + y) = malloc(type_size * width);
         for(int x = 0; x < width; x++)
         {
-            if (value != NULL) memcpy((void *) (*(aux + y) + x * type_size), value, type_size);
+            if (value != NULL) 
+                memcpy((void *) (*(aux + y) + x * type_size), value, type_size);
         }
         // cout << "\n";
     }
@@ -284,7 +285,8 @@ void mutation(bool *number, int number_size)
     {
         bool *b;
         b = number + i;
-        if(1.0 / (double) number_size <= (double) random()/ (double) RAND_MAX)
+        // if(1.0 / (double) number_size <= (double) random()/ (double) RAND_MAX)
+        if((double) random()/ (double) RAND_MAX <= MUTATION)
             *b = !(*b);
     }
 }

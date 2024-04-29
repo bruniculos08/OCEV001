@@ -1,6 +1,8 @@
 #include <bits/stdc++.h>
 // #include <gnuplot-iostream.h>
 
+// O objetivo neste arquivo é fazer uma função genérica para todos os problemas de otmização.
+
 using namespace std;
 
 #define POPULATION_SIZE 30
@@ -19,20 +21,20 @@ union allele
 
 typedef struct Population
 {
-    vector<allele> *matrix;
+    vector<vector<allele>> matrix;
     int type_size, ind_dim, pop_size;
 } population;
 
-typedef struct Clause
+typedef struct Optmization
 {
-    int variables[3];
-} clause;
+    // coeficientes da função objetivo:
+    vector<double> coeffs_obj;
+    // coeficientes de equações da forma: an1.x1 + an2.x2 + anm.xm <= k 
+    vector<vector<double>> coeffs_leq;
+    // coeficientes do lado direitos das equações;
+    vector<double> consts;
 
-typedef struct Formula
-{
-    int formumla_size, number_of_variables;
-    clause *expr;
-} formula;
+} optmization;
 
 vector<pair<double, double>> data_plot;
 
@@ -53,10 +55,8 @@ vector<allele> *generatePermPop(int ind_dim, int pop_size, allele low, allele hi
 vector<allele> *generateBoolPop(int ind_dim, int pop_size);
 vector<allele> *generateDoublePop(int ind_dim, int pop_size, allele low, allele high);
 
-/* --------------------- Funções para modelagem do problema 3-SAT --------------------- */
+/* --------------------- Funções para modelagem do problema de otmização de função real --------------------- */
 
-// Gerar problema 3SAT de n clausulas (note que "variables_num" deve ser igual à "pop_size"):
-void generate3SAT(formula &sat, int formula_size, int variables_num);
 // Gerar problema 3SAT a partir de arquivo:
 void fromFileGenerate3SAT(formula &sat, string file_path);
 // Densenvolver gerações:

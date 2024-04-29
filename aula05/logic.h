@@ -3,6 +3,7 @@
 using namespace std;
 
 #define GENERATIONS 500000
+#define MUTATION 0.01
 
 typedef struct Population
 {

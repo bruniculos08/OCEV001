@@ -36,151 +36,129 @@ int clampi(int k, int low, int high)
     return k;
 }
 
-void **allocateGenericMatrix(int width, int height, void *value, int type_size)
-{
-    type_size /= sizeof(char);
-
-    void **matrix;
-    matrix = (void **) malloc(sizeof(void *) * height);
-    char **aux;
-    aux = (char **) matrix;
-
-    for (int y = 0; y < height; y++)
-    {
-        *(matrix + y) = malloc(type_size * width);
-        for(int x = 0; x < width; x++)
-        {
-            if (value != NULL) memcpy((void *) (*(aux + y) + x * type_size), value, type_size);
-        }
-        // cout << "\n";
-    }
-    return matrix;
+vector<vector<allele>> allocateGenericMatrix(int width, int height, allele &value)
+{   
+    vector<allele> u(width, value);
+    vector<vector<allele>> v(height, u);
+    return v;
 }
 
-void printIntMatrix(int **matrix, int width, int height)
+void printIntMatrix(vector<vector<allele>> &matrix)
 {
-    for (int y = 0; y < height; y++)
+    for (vector<allele> &y : matrix)
     {
-        for (int x = 0; x < width; x++)
+        for (allele &x : y)
         {
-            cout << matrix[y][x] << " " ;
+            cout << x.integer << " " ;
         }
         cout << endl;
     }
 }
 
-void printBoolMatrix(bool **matrix, int width, int height)
+void printBoolMatrix(vector<vector<allele>> &matrix)
 {
-    for (int y = 0; y < height; y++)
+    for (vector<allele> &y : matrix)
     {
-        for (int x = 0; x < width; x++)
+        for (allele &x : y)
         {
-            cout << matrix[y][x] << " " ;
+            cout << x.boolean << " " ;
         }
         cout << endl;
     }
 }
 
-void printDoubleMatrix(double **matrix, int width, int height)
+void printDoubleMatrix(vector<vector<allele>> &matrix)
 {
-    for (int y = 0; y < height; y++)
+    for (vector<allele> &y : matrix)
     {
-        for (int x = 0; x < width; x++)
+        for (allele &x : y)
         {
-            cout << matrix[y][x] << " " ;
+            cout << x.real << " " ;
         }
         cout << endl;
     }
 }
 
-void permute(int *list, int size)
+void permute(vector<allele> &v)
 {
-    for (int i = 0; i < size; i++)
+    allele aux;
+    for (int i = 0; i < v.size(); i++)
     {
-        int j = random() % size;
-        int aux = list[i];
-        list[i] = list[j];        
-        list[j] = aux;        
+        int j = random() % v.size();
+        aux = v[i];
+        v[i] = v[j];        
+        v[j] = aux;        
     }
 }
 
-int **generateIntPop(int ind_dim, int pop_size, int low, int high)
+void generateIntPop(vector<vector<allele>> &v, int width, int height, allele low, allele high)
 {
-    assert(low < high);
-    srand(time(0));
+    assert(low.integer < high.integer);
+    
+    v = allocateGenericMatrix(width, height, low);
 
-    int **matrix;
-    matrix = (int **) allocateGenericMatrix(ind_dim, pop_size, (void *) &low, sizeof(int));
-
-    for (int y = 0; y < pop_size; y++)
+    for (int y = 0; y < height; y++)
     {
-        for (int x = 0; x < ind_dim; x++)
+        for (int x = 0; x < width; x++)
         {
-            matrix[y][x] = (random() % (high - low)) + low;
+            v[y][x].integer = (random() % (high.integer - low.integer)) + low.integer;
         }
     }
-
-    return matrix;
 }
 
-int **generatePermPop(int ind_dim, int pop_size, int low, int high)
+void generatePermPop(int width, int height, vector<vector<allele>> &v, allele low, allele high)
 {
-    assert(low < high);
-    assert(high-low >= ind_dim);
-    int **matrix;
-    matrix = (int **) allocateGenericMatrix(ind_dim, pop_size, NULL, sizeof(int));
-    for (int y = 0; y < pop_size; y++)
+    assert(low.integer < high.integer);
+    assert(high.integer - low.integer >= width);
+
+    v = allocateGenericMatrix(width, height, low);
+
+    for (int y = 0; y < height; y++)
     {
-        for (int x = 0; x < ind_dim; x ++)
+        for (int x = 0; x < width; x ++)
         {
             try_again:
-            int num = (random() % (high - low)) + low;
+            int num = (random() % (high.integer - low.integer)) + low.integer;
             for (int i = 0; i < x; i++)
             {
-                if (matrix[y][i] == num) goto try_again;
+                if (v[y][i].integer == num) goto try_again;
             }
-            matrix[y][x] = num;
+            v[y][x].integer = num;
         }
     }
-    return matrix;
 }
 
-bool **generateBoolPop(int ind_dim, int pop_size)
+void generateBoolPop(int width, int height, vector<vector<allele>> &v)
 {
-    // srand(time(0));
-    bool temp = true;
+    allele temp;
+    temp.boolean = true;
 
-    bool **matrix;
-    matrix = (bool **) allocateGenericMatrix(ind_dim, pop_size, (void *) &temp, sizeof(bool));
+    v = allocateGenericMatrix(width, height, temp);
 
-
-    for (int y = 0; y < pop_size; y++)
+    for (int y = 0; y < height; y++)
     {
-        for (int x = 0; x < ind_dim; x++)
+        for (int x = 0; x < width; x++)
         {
-            matrix[y][x] = (bool) (random() % 2 == 0);
+            v[y][x].boolean = (bool) (random() % 2 == 0);
         }
     }
-
-    return matrix;
 }
 
-double **generateDoublePop(int ind_dim, int pop_size, double low, double high)
+void generateDoublePop(int width, int height, vector<vector<allele>> &v, allele low, allele high)
 {
-    assert(low < high);
+    assert(low.real < high.real);
+    allele temp;
+    temp.real = 0.0;
 
-    double **matrix;
-    matrix = (double **) allocateGenericMatrix(ind_dim, pop_size, (void *) NULL, sizeof(double));
+    v = allocateGenericMatrix(width, height, temp);
 
-    for (int y = 0; y < pop_size; y++)
+    for (int y = 0; y < width; y++)
     {
-        for (int x = 0; x < ind_dim; x++)
+        for (int x = 0; x < height; x++)
         {
-            matrix[y][x] = ((double) random() / RAND_MAX) * (high - low) + low;
+            v[y][x].real = ((double) random() / (double) RAND_MAX) * (high.real - low.real) + low.real;
         }
     }
-
-    return matrix;
 }
 
 /* --------------------- Funções para modelagem do problema de otimização de função real --------------------- */
