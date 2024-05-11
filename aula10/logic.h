@@ -1,9 +1,9 @@
 #include <bits/stdc++.h>
 #include <gnuplot-iostream.h>
+
 using namespace std;
 
-
-#define POPULATION_SIZE 30
+#define POPULATION_SIZE 50
 #define MUTATION_PROBABILITY 0.01
 //  Se o seguinte valor for 0 ou maior que a dimensão dos individuos - 2, 
 //  faz-se crossover uniforme:
@@ -11,7 +11,7 @@ using namespace std;
 //  Se este valor for 0 ou maior que POPULATION_SIZE, 
 //  todos os individuos participam do torneio:
 #define TOURNAMENT_SAMPL 5
-#define GENERATIONS 1000
+#define GENERATIONS 200
 //  Se o seguinte valor for "true" será feita seleção por torneio, 
 //  e se for "false" será feita seleção por roleta viciada:
 #define SELECTION_OPT false
@@ -49,9 +49,16 @@ typedef struct NQueens
     int dim;
 } nqueens;
 
-// Variáveis globais:
+typedef struct Args
+{
+    int ind1, ind2, cuts_num;
+    population *p;
+
+} args;
+
 vector<pair<double, double>> data_plot;
-vector<mutex> control_crossover(POPULATION_SIZE);
+pthread_t threads[POPULATION_SIZE/2 + 1];
+// pthread_mutex_t mtx_crossover[POPULATION_SIZE];
 
 //  Funções auxiliares:
 int clampi(int x, int low, int high);
@@ -93,9 +100,13 @@ int roulette(vector<int> &single_ind, nqueens &b, population &p);
 //  - Realiza crossover entre todos:
 void crossoverAll(nqueens &b, int samples_num, population &p, int cuts_num);
 //  - Cruzamento: misturar 2 individuos gerando 2 filhos usando método PMX.
-void crossoverPMX(int ind1, int ind2, population *p, int cuts_num);
+void crossoverPMX(int ind1, int ind2, population &p, int cuts_num);
+//  - Função para execução da anterior por meio de outra thread:
+void *threadCrossoverPMX(void *data);
 //  - Cruzamento: misturar 2 individuos gerando 2 filhos usando método CX.
-void crossoverCX(int ind1, int ind2, population *p, int cuts_num);
+void crossoverCX(int ind1, int ind2, population &p, int cuts_num);
+//  - Função para execução da anterior por meio de outra thread:
+void *threadCrossoverCX(void *data);
 //  - Mutação: alterar randomicamente alelos de um indivíduo.
 void mutation(vector<allele> &dna, population &p);
 //  - Mutação: alterar randomicamente alelos de um indivíduo.
