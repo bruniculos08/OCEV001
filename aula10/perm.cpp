@@ -2,7 +2,7 @@
 
 int main(void)
 {
-    srandom(time(0));
+    // srandom(time(0));
 
     //  Criar o tabuleiro:
     nqueens b;
@@ -155,26 +155,20 @@ int **createBoard(int width, int height)
 int evolve(nqueens &b, population &p)
 {
     calcEsc(b, p, SCALING_CONSTANT);
-    // double best_fitness = 0.0;
-    int best_id = 0, worst_id = 0, counter = GENERATIONS;
     vector<allele> best_individual;
-    best_id = getElite(b, p, best_individual);
+    int best_id = getElite(b, p, best_individual), worst_id = 0, counter = GENERATIONS;
     cout << "Started evolving" << endl;
     do
     {
         calcEsc(b, p, SCALING_CONSTANT);
         crossoverAll(b, p.pop_size, p, CUT_POINTS_CROSSOVER);
+        
         worst_id = getWorst(b, p);
-        // cout << fitnessEsc(b, worst_id, p) << " <- old (worst) result" << endl;
         if(counter % 200 == 0) 
             cout << fitness(b, worst_id, p) << " <- old (worst) result" << endl;
-        p.matrix[worst_id] = best_individual;
-
+       p.matrix[worst_id] = best_individual;
 
         best_id = getElite(b, p, best_individual);
-        // best_fitness = fitnessEsc(b, best_id, p); 
-
-        // cout << best_fitness << " <- current best result" << endl;
         if(counter % 200 == 0)
             cout << fitness(b, best_id, p) << " <- current best result" << endl;
         
@@ -231,13 +225,15 @@ int tournament(nqueens &b, int samples_num, population &p, vector<int> &single_i
     for(int i = 0; i < samples_num; i++)
     {
         rand_id = getRandom<int>(single_ind);
+        control_crossover[rand_id].lock();
         if(choosen_ind_id == -1 || fitnessEsc(b, rand_id, p) > best_fitness)
         {
             if(choosen_ind_id != -1) poll_rest.push_back(choosen_ind_id);
-            choosen_ind_id = rand_id;        
-            best_fitness = fitnessEsc(b, choosen_ind_id, p);
+            choosen_ind_id = rand_id;  
+            best_fitness = fitnessEsc(b, choosen_ind_id, p); 
         }
         else poll_rest.push_back(rand_id);
+        control_crossover[rand_id].unlock();
     }
 
     for(int id : poll_rest) single_ind.push_back(id);
@@ -255,7 +251,9 @@ int roulette(vector<int> &single_ind, nqueens &b, population &p)
     //     }
     // else
     for(int index : single_ind){
+        control_crossover[index].lock();
         summ += (double) fitnessEsc(b, index, p);
+        control_crossover[index].unlock();
     }
 
     if(summ == 0){
@@ -268,9 +266,11 @@ int roulette(vector<int> &single_ind, nqueens &b, population &p)
     double prob; 
     vector<double> roulette_chances;
     for(int index : single_ind)
-    {
+    {   
+        control_crossover[index].lock();
         prob = 100.0 * fitnessEsc(b, index, p) / summ;
         roulette_chances.push_back(prob);
+        control_crossover[index].unlock();
     }
 
 
@@ -283,8 +283,6 @@ int roulette(vector<int> &single_ind, nqueens &b, population &p)
         {
             result = single_ind[i];
             eraseFast(single_ind, i);
-            // cout << "Individuo selecionado pela roleta = " 
-            //      << single_ind[i] << " (fitness = " << fitness(sat, result, p) << ")" << endl;
             return result;
         }
         acc += roulette_chances[i];
@@ -296,6 +294,7 @@ void crossoverAll(nqueens &b, int samples_num, population &p, int cuts_num)
 {
     vector<int> single_ind;
     for(int i = 0; i < p.pop_size; i++) single_ind.push_back(i);
+    vector<thread> thrs;
 
     int parent1_index, parent2_index;
     while(single_ind.size() >= 2)
@@ -310,27 +309,42 @@ void crossoverAll(nqueens &b, int samples_num, population &p, int cuts_num)
             parent1_index = roulette(single_ind, b, p);
             parent2_index = roulette(single_ind, b, p);
         }
-        // cout << "crossing " << parent1_index << " and " << parent2_index << endl;
         if(CROSSOVER_OPT)
-            crossoverPMX(parent1_index, parent2_index, p, cuts_num);
+        {
+            thrs.push_back(thread(crossoverPMX, parent1_index, parent2_index, &p, cuts_num));
+        }
         else
-            crossoverCX(parent1_index, parent2_index, p, cuts_num);
-        mutation(p.matrix[parent1_index], p);
-        mutation(p.matrix[parent2_index], p);
+        {
+            thrs.push_back(thread(crossoverCX, parent1_index, parent2_index, &p, cuts_num));
+        }
+    }
+    for(thread &t_addr : thrs)
+    {
+        t_addr.join();
     }
 }
 
-void crossoverPMX(int ind1, int ind2, population &p, int cut_size)
+void crossoverPMX(int ind1, int ind2, population *p, int cut_size)
 {
     allele none;
     none.integer = -1;
-    vector<allele> f1 = p.matrix[ind1];
-    vector<allele> f2 = p.matrix[ind2];
-    vector<allele> s1(p.ind_dim, none);
-    vector<allele> s2(p.ind_dim, none);
 
-    int cut1 = random() % p.ind_dim, cut2 = random() % p.ind_dim;
-    if(cut_size > 0) cut2 = min(cut1 + cut_size - 1, p.ind_dim - 1);
+    // population p_copy = *p;
+
+    //  Ponto crítico:
+    vector<allele> s1(p->ind_dim, none);
+    vector<allele> s2(p->ind_dim, none);
+
+    control_crossover[ind1].lock();
+    vector<allele> f1 = p->matrix[ind1];
+    control_crossover[ind1].unlock();
+
+    control_crossover[ind2].lock();
+    vector<allele> f2 = p->matrix[ind2]; 
+    control_crossover[ind2].unlock();
+
+    int cut1 = random() % p->ind_dim, cut2 = random() % p->ind_dim;
+    if(cut_size > 0) cut2 = min(cut1 + cut_size - 1, p->ind_dim - 1);
 
     // Colocando segmentos nos filhos:
     for(int i = cut1; i <= cut2; i++)
@@ -389,36 +403,53 @@ void crossoverPMX(int ind1, int ind2, population &p, int cut_size)
 
     // (3) Completar os vetores:
     int index_s1 = 0, index_s2 = 0;
-    for (int i = 0; i < p.ind_dim; i++)
+    for (int i = 0; i < p->ind_dim; i++)
     {
-        if(linearSearch(s1, f2[i], 0, p.ind_dim - 1) == -1)
+        if(linearSearch(s1, f2[i], 0, p->ind_dim - 1) == -1)
         {
-            index_s1 = linearSearch(s1, none, 0, p.ind_dim - 1);
+            index_s1 = linearSearch(s1, none, 0, p->ind_dim - 1);
             s1[index_s1] = f2[i];
         }
-        if(linearSearch(s2, f1[i], 0, p.ind_dim - 1) == -1)
+        if(linearSearch(s2, f1[i], 0, p->ind_dim - 1) == -1)
         {
-            index_s2 = linearSearch(s2, none, 0, p.ind_dim - 1);
+            index_s2 = linearSearch(s2, none, 0, p->ind_dim - 1);
             s2[index_s2] = f1[i];
         }
     }
 
-    p.matrix[ind1].swap(s1);
-    p.matrix[ind2].swap(s2);
+    //  Ponto crítico:
+    control_crossover[ind1].lock();
+    p->matrix[ind1].swap(s1);
+    mutation(p->matrix[ind1], (*p));
+    control_crossover[ind1].unlock();
+
+    control_crossover[ind2].lock();
+    p->matrix[ind2].swap(s2);
+    mutation(p->matrix[ind2], (*p));
+    control_crossover[ind2].unlock();
 }
 
-void crossoverCX(int ind1, int ind2, population &p, int cuts_num)
+void crossoverCX(int ind1, int ind2, population *p, int cuts_num)
 {
     allele none;
     none.integer = -1;
     allele start_value;
     int temp_pos;
-    vector<allele> s1(p.ind_dim, none);
-    vector<allele> s2(p.ind_dim, none);
-    vector<allele> p1 = p.matrix[ind1];
-    vector<allele> p2 = p.matrix[ind2];
+
+    vector<allele> s1(p->ind_dim, none);
+    vector<allele> s2(p->ind_dim, none);
+
+    //  Ponto crítico:
+    control_crossover[ind1].lock();
+    vector<allele> p1 = p->matrix[ind1];
+    control_crossover[ind1].unlock();
+
+    control_crossover[ind2].lock();
+    vector<allele> p2 = p->matrix[ind2];
+    control_crossover[ind2].unlock();
+
     vector<allele> aux;
-    for(int i = 0; i < p.ind_dim; i++)
+    for(int i = 0; i < p->ind_dim; i++)
     {
         // (1) Ciclo sobre o primeiro filho:
         if(s1[i].integer == -1)
@@ -428,7 +459,7 @@ void crossoverCX(int ind1, int ind2, population &p, int cuts_num)
             do
             {
                 s1[temp_pos] = p1[temp_pos];
-                temp_pos = linearSearch(p1, p2[temp_pos], 0, p.ind_dim - 1);
+                temp_pos = linearSearch(p1, p2[temp_pos], 0, p->ind_dim - 1);
             } while (p1[temp_pos].integer != start_value.integer);      
         }
         // (2) Ciclo sobre o segundo filho:
@@ -439,15 +470,24 @@ void crossoverCX(int ind1, int ind2, population &p, int cuts_num)
             do
             {
                 s2[temp_pos] = p2[temp_pos];
-                temp_pos = linearSearch(p2, p1[temp_pos], 0, p.ind_dim - 1);
+                temp_pos = linearSearch(p2, p1[temp_pos], 0, p->ind_dim - 1);
             } while (p2[temp_pos].integer != start_value.integer);      
         }
         aux = p1;
         p1 = p2;
         p2 = aux;        
     }
-    p.matrix[ind1] = s1;
-    p.matrix[ind2] = s2;
+
+    //  Ponto crítico:
+    control_crossover[ind1].lock();
+    p->matrix[ind1] = s1;
+    mutation(p->matrix[ind1], (*p));
+    control_crossover[ind1].unlock();
+
+    control_crossover[ind2].lock();
+    p->matrix[ind2] = s2;
+    mutation(p->matrix[ind2], (*p));
+    control_crossover[ind2].unlock();
 }
 
 void mutation(vector<allele> &dna, population &p){
